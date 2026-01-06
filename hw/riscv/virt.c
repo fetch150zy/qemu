@@ -83,7 +83,7 @@ static bool virt_aclint_allowed(void)
 
 static const MemMapEntry virt_memmap[] = {
     [VIRT_DEBUG] =        {        0x0,         0x100 },
-    [VIRT_MROM] =         {     0x1000,        0xf000 },
+    [VIRT_MROM] =         {     0x1000,       0x1f000 },
     [VIRT_TEST] =         {   0x100000,        0x1000 },
     [VIRT_RTC] =          {   0x101000,        0x1000 },
     [VIRT_CLINT] =        {  0x2000000,       0x10000 },
@@ -1873,6 +1873,13 @@ static void virt_machine_instance_init(Object *obj)
     s->iommu_sys = ON_OFF_AUTO_AUTO;
 }
 
+static void virt_machine_instance_finalize(Object *obj)
+{
+    RISCVVirtState *s = RISCV_VIRT_MACHINE(obj);
+
+    g_free(s->rom);
+}
+
 static char *virt_get_aia_guests(Object *obj, Error **errp)
 {
     RISCVVirtState *s = RISCV_VIRT_MACHINE(obj);
@@ -2009,6 +2016,20 @@ static void virt_set_iopmp_layout(Object *obj, Visitor *v,
     s->iopmp_layout = value;
 }
 
+static char *virt_get_rom(Object *obj, Error **errp)
+{
+    RISCVVirtState *s = RISCV_VIRT_MACHINE(obj);
+    return g_strdup(s->rom);
+}
+
+static void virt_set_rom(Object *obj, const char *value, Error **errp)
+{
+    RISCVVirtState *s = RISCV_VIRT_MACHINE(obj);
+
+    g_free(s->rom);
+    s->rom = g_strdup(value);
+}
+
 bool virt_is_acpi_enabled(RISCVVirtState *s)
 {
     return s->acpi != ON_OFF_AUTO_OFF;
@@ -2142,6 +2163,8 @@ static void virt_machine_class_init(ObjectClass *oc, void *data)
     object_class_property_set_description(oc, "iopmp",
                                           "Set on/off to enable/disable "
                                           "iopmp device");
+    object_class_property_add_str(oc, "rom", virt_get_rom, virt_set_rom);
+    object_class_property_set_description(oc, "rom", "ROM image");
     /* Provide default layouts for iopmp */
     object_class_property_add(oc, "iopmp-layout", "uint32_t",
                               virt_get_iopmp_layout, virt_set_iopmp_layout,
@@ -2164,6 +2187,7 @@ static const TypeInfo virt_machine_typeinfo = {
     .parent     = TYPE_MACHINE,
     .class_init = virt_machine_class_init,
     .instance_init = virt_machine_instance_init,
+    .instance_finalize = virt_machine_instance_finalize,
     .instance_size = sizeof(RISCVVirtState),
     .interfaces = (InterfaceInfo[]) {
          { TYPE_HOTPLUG_HANDLER },
